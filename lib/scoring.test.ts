@@ -29,7 +29,7 @@ const goodListing: ListingInput = {
     "The cozy mug that makes every morning feel like a little treat — perfect for the coffee lover who appreciates handmade, personalized details.\n\nMade from durable ceramic and customized with any name, it's a thoughtful gift she'll reach for every single day.\n\n- Holds 11oz\n- Dishwasher safe\n- Ships in 3-5 days",
   category: "Home & Living > Kitchen & Dining > Drinkware > Mugs",
   targetKeyword: "personalized coffee mug",
-  photoCount: 8,
+  photoCount: 12,
   hasLifestylePhoto: true,
 };
 
@@ -159,6 +159,18 @@ describe("CONVERSION rules", () => {
     const r = scoreListing({ ...goodListing, photoCount: 3 });
     const issue = findIssue(r.issues, "Photos", "Critical");
     expect(issue?.problem).toMatch(/3 photo/);
+  });
+
+  it("5–9 photos is a Warning (-7) referencing the 20 slots", () => {
+    const r = scoreListing({ ...goodListing, photoCount: 7 });
+    const issue = findIssue(r.issues, "Photos", "Warning");
+    expect(issue?.problem).toMatch(/7 of 20/);
+    expect(scoreListing(goodListing).conversionScore - r.conversionScore).toBe(7);
+  });
+
+  it("10+ photos incurs no photo penalty", () => {
+    const r = scoreListing({ ...goodListing, photoCount: 10 });
+    expect(r.issues.some((i) => i.field === "Photos")).toBe(false);
   });
 
   it("no lifestyle photo is Critical (-20)", () => {
@@ -293,5 +305,107 @@ describe("empty / incomplete listings are not let off the hook", () => {
   it("a too-thin (<100 char) description also fires all four", () => {
     const r = scoreListing({ ...goodListing, description: "A nice mug." });
     expect(r.issues.filter((i) => i.field === "Description")).toHaveLength(4);
+  });
+});
+
+describe("per-section breakdown (display metadata)", () => {
+  it("always returns all five sections in order", () => {
+    const r = scoreListing(goodListing);
+    expect(r.sections.map((s) => s.name)).toEqual([
+      "Title",
+      "Tags",
+      "Description",
+      "Photos",
+      "Category",
+    ]);
+  });
+
+  it("a healthy listing scores 100/A across every section", () => {
+    const r = scoreListing(goodListing);
+    for (const s of r.sections) {
+      expect(s.score).toBe(100);
+      expect(s.grade).toBe("A");
+    }
+  });
+
+  it("does not change the headline scores or verdict", () => {
+    const r = scoreListing(goodListing);
+    // Baseline expectations from the existing healthy-listing tests.
+    expect(r.visibilityScore).toBe(100);
+    expect(r.conversionScore).toBe(100);
+    expect(r.verdict).toMatch(/good shape/i);
+  });
+
+  it("isolates the dragging section — weak tags only dent the Tags sub-score", () => {
+    const r = scoreListing({
+      ...goodListing,
+      tags: [
+        "cottagecore mug",
+        "custom coffee mug",
+        "custom name mug",
+        "gift for mom",
+        "cozy kitchen mug",
+        "ceramic coffee cup",
+        "botanical mug gift",
+        "mug", // single
+        "gift", // single
+        "cute", // single
+        "cozy", // single
+        "slow living mug",
+        "floral mug her",
+      ],
+    });
+    const byName = Object.fromEntries(r.sections.map((s) => [s.name, s]));
+    // 4 single-word tags → -12 (capped) on the Tags section only.
+    expect(byName.Tags.score).toBe(88);
+    expect(byName.Title.score).toBe(100);
+    expect(byName.Photos.score).toBe(100);
+    expect(byName.Description.score).toBe(100);
+  });
+});
+
+describe("tag completeness vs quality (display metadata)", () => {
+  it("reports completeness as slots used out of 13", () => {
+    const r = scoreListing({
+      ...goodListing,
+      tags: ["one phrase", "two phrase", "three phrase"],
+    });
+    expect(r.tagStats.slotsUsed).toBe(3);
+    expect(r.tagStats.totalSlots).toBe(13);
+    expect(r.tagStats.note).toMatch(/3\/13 slots used/);
+  });
+
+  it("flags complete-but-low-quality: all 13 slots used yet weak tags", () => {
+    const r = scoreListing({
+      ...goodListing,
+      tags: [
+        "cottagecore mug",
+        "custom coffee mug",
+        "custom name mug",
+        "gift for mom",
+        "cozy kitchen mug",
+        "ceramic coffee cup",
+        "botanical mug gift",
+        "mug",
+        "gift",
+        "cute",
+        "cozy",
+        "slow living mug",
+        "floral mug her",
+      ],
+    });
+    expect(r.tagStats.slotsUsed).toBe(13);
+    expect(r.tagStats.weakCount).toBe(4);
+    expect(r.tagStats.weak.singleWord).toBe(4);
+    expect(r.tagStats.note).toMatch(
+      /All 13 slots used, but 4 single generic words/
+    );
+  });
+
+  it("says all-strong when 13 clean tags are used", () => {
+    const r = scoreListing(goodListing);
+    expect(r.tagStats.slotsUsed).toBe(13);
+    expect(r.tagStats.weakCount).toBe(0);
+    expect(r.tagStats.note).toMatch(/solid multi-word tags/i);
   });
 });

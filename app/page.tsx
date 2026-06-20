@@ -62,7 +62,7 @@ export default function Home() {
       setDescription(json.description ?? "");
       setCategory(json.category ?? "");
       setPhotoCount(
-        Math.max(0, Math.min(10, Number(json.photoCount) || 0))
+        Math.max(0, Math.min(20, Number(json.photoCount) || 0))
       );
       fillTags(Array.isArray(json.tags) ? json.tags : []);
       setFetchOk(true);
@@ -317,11 +317,11 @@ export default function Home() {
               id="photos"
               type="number"
               min={0}
-              max={10}
+              max={20}
               value={photoCount}
               onChange={(e) =>
                 setPhotoCount(
-                  Math.max(0, Math.min(10, Number(e.target.value) || 0))
+                  Math.max(0, Math.min(20, Number(e.target.value) || 0))
                 )
               }
               className={`${inputClass} mt-1`}

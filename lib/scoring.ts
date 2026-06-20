@@ -17,7 +17,7 @@ export interface ListingInput {
   category: string;
   /** Optional. When present, drives the strongest visibility checks. */
   targetKeyword?: string;
-  /** 0–10 */
+  /** 0–20 */
   photoCount: number;
   /** At least one real/lifestyle photo (not just a plain mockup)? */
   hasLifestylePhoto: boolean;
@@ -33,6 +33,27 @@ export interface Issue {
   severity: IssueSeverity;
   problem: string;
   fix: string;
+  /** Points this issue deducted (display metadata; does not change the scores). */
+  points: number;
+}
+
+export type SectionName = "Title" | "Tags" | "Description" | "Photos" | "Category";
+
+export interface SectionScore {
+  name: SectionName;
+  score: number;
+  grade: Grade;
+}
+
+export interface TagStats {
+  /** Non-empty tags provided. */
+  slotsUsed: number;
+  totalSlots: number;
+  /** Distinct tags flagged as weak (single-word, over-long, or duplicate). */
+  weakCount: number;
+  weak: { singleWord: number; tooLong: number; duplicate: number };
+  /** Plain-English completeness + quality summary. */
+  note: string;
 }
 
 export interface ScoringResult {
@@ -42,6 +63,10 @@ export interface ScoringResult {
   conversionGrade: Grade;
   verdict: string;
   issues: Issue[];
+  /** Secondary per-section breakdown (display only). */
+  sections: SectionScore[];
+  /** Tag completeness vs. quality (display only). */
+  tagStats: TagStats;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +181,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
       problem:
         "Your listing has no title and no target keyword — Etsy has nothing to rank it on, so buyers cannot find it at all.",
       fix: 'Add a descriptive title that leads with the exact phrase a buyer would search (e.g. "Personalized Coffee Mug").',
+      points: 25,
     });
   } else {
     if (assumedFromTitle) {
@@ -165,6 +191,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
         severity: "Info",
         problem: `No keyword set — we assumed "${effectiveKeyword}" from your title; set it explicitly for accuracy.`,
         fix: "Enter the one phrase a buyer would type to find this, so we can check its placement precisely instead of guessing.",
+        points: 0,
       });
     }
     if (!titleLower.includes(effectiveKeywordLower)) {
@@ -175,6 +202,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
         severity: "Critical",
         problem: `Your target keyword "${effectiveKeyword}" does not appear in the title at all.`,
         fix: `Put "${effectiveKeyword}" in the title — ideally near the front. Etsy weighs the title heavily for search ranking.`,
+        points: 25,
       });
     } else if (!titleLower.slice(0, 40).includes(effectiveKeywordLower)) {
       visibility -= 10;
@@ -184,6 +212,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
         severity: "Warning",
         problem: `Your target keyword "${effectiveKeyword}" appears in the title, but not in the first 40 characters.`,
         fix: `Move "${effectiveKeyword}" to the start of the title. Etsy (and shoppers) give the most weight to the opening words.`,
+        points: 10,
       });
     }
   }
@@ -200,6 +229,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
           ? "Your listing has no title, so there's nothing for Etsy to index."
           : `Your title is only ${title.length} characters — too short to capture many search phrases.`,
       fix: "Aim for roughly 70–140 characters. Use the extra room for additional real keyword phrases buyers search.",
+      points: 10,
     });
   } else if (title.length > 140) {
     visibility -= 10;
@@ -209,6 +239,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
       severity: "Warning",
       problem: `Your title is ${title.length} characters, over Etsy's 140-character limit.`,
       fix: "Trim the title to 140 characters or fewer; anything beyond the limit is cut off.",
+      points: 10,
     });
   }
 
@@ -222,6 +253,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
       severity: "Critical",
       problem: `You're using only ${tags.length} of 13 tags — leaving ${missing} unused.`,
       fix: "Fill all 13 tags. Each empty tag is a free search phrase you're throwing away. Use multi-word, long-tail phrases.",
+      points: 3 * missing,
     });
   }
 
@@ -239,6 +271,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
         .map((t) => `"${t}"`)
         .join(", ")}${singleWordTags.length > 5 ? "…" : ""}.`,
       fix: "Replace single words with long-tail phrases (e.g. \"mug\" → \"funny coffee mug for nurses\"). Multi-word tags match more specific, higher-intent searches.",
+      points: penalty,
     });
   }
 
@@ -254,6 +287,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
         .map((t) => `"${t}"`)
         .join(", ")}.`,
       fix: "Shorten each of these to 20 characters or fewer, or Etsy will reject them.",
+      points: 3 * longTags.length,
     });
   }
 
@@ -279,6 +313,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
         .map((t) => `"${t}"`)
         .join(", ")}.`,
       fix: "Every tag should be distinct. Swap duplicates for new phrases to widen the searches you appear in.",
+      points: 3 * dupes.length,
     });
   }
 
@@ -294,6 +329,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
         ? `Category "${category}" looks too broad or unspecific.`
         : "No category provided.",
       fix: "Choose the most specific category Etsy offers (e.g. \"Home & Living > Kitchen > Drinkware > Mugs\"). Specific categories rank better and surface in browse.",
+      points: 10,
     });
   }
 
@@ -320,6 +356,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
           ? "Your title reads like keyword soup — lots of comma-separated phrases but no clear statement of what the product actually is."
           : "Your title doesn't clearly name the product. A shopper skimming results can't instantly tell what it is.",
       fix: "Lead with a plain product noun a human understands (e.g. \"Ceramic Coffee Mug\"), then layer keywords after it. Write for the buyer first, the algorithm second.",
+      points: 20,
     });
   }
 
@@ -338,6 +375,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
           ? "Your listing has no description — buyers get no answers and no reason to trust or buy."
           : `Your description is only ${description.length} characters — too thin to answer buyer questions or build trust.`,
       fix: "Write at least a few short paragraphs: what it is, who it's for, why they'll love it, and the key details (size, materials, shipping).",
+      points: 15,
     });
 
     conversion -= 10; // no hook
@@ -348,6 +386,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
       problem:
         "There's no opening hook — with so little text, the first line can't earn the click or set up the sale.",
       fix: "Open with the emotional payoff — e.g. \"The cozy mug that makes every morning feel like a treat.\" Save dimensions and materials for lower down.",
+      points: 10,
     });
 
     conversion -= 8; // not skimmable
@@ -358,6 +397,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
       problem:
         "There's not enough description to skim — no \"who it's for\", key details, or gift angle for a buyer to scan.",
       fix: "Break it into short chunks with line breaks or bullets: a hook, \"Perfect for…\", key details, and a gift/why-buy line.",
+      points: 8,
     });
 
     conversion -= 7; // no emotional / benefit language
@@ -368,6 +408,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
       problem:
         "There's no emotional or benefit language to make a buyer want it — there's barely any copy at all.",
       fix: "Add why it matters: who it's perfect for, how it'll make them feel, why it makes a great gift. Sell the outcome, not just the object.",
+      points: 7,
     });
   } else {
     // First line: hook vs. dry specs.
@@ -385,6 +426,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
         problem:
           "Your description opens with specs or a flat statement instead of a benefit/hook. The first line is prime selling real estate.",
         fix: "Open with the emotional payoff — e.g. \"The cozy mug that makes every morning feel like a treat.\" Save dimensions and materials for lower down.",
+        points: 10,
       });
     }
 
@@ -398,6 +440,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
         severity: "Info",
         problem: "Your description is one solid block of text with no line breaks — hard to skim on mobile.",
         fix: "Break it into short chunks with line breaks or bullets: a hook, \"Perfect for…\", key details, and a gift/why-buy line.",
+        points: 8,
       });
     }
 
@@ -413,11 +456,12 @@ export function scoreListing(input: ListingInput): ScoringResult {
         severity: "Info",
         problem: "Your description is purely factual — there's no emotional or benefit language to make a buyer want it.",
         fix: "Add why it matters: who it's perfect for, how it'll make them feel, why it makes a great gift. Sell the outcome, not just the object.",
+        points: 7,
       });
     }
   }
 
-  // --- Photo count ---
+  // --- Photo count (Etsy allows up to 20 photos) ---
   if (photoCount < 5) {
     conversion -= 20;
     issues.push({
@@ -425,7 +469,18 @@ export function scoreListing(input: ListingInput): ScoringResult {
       category: "Conversion",
       severity: "Critical",
       problem: `Only ${photoCount} photo(s) on the listing. Buyers can't fully judge the product, so they bounce.`,
-      fix: "Add photos until you have at least 5–10: different angles, scale/in-use, close-up of detail, and packaging. Photos are the #1 conversion lever.",
+      fix: "Add photos until you have at least 5 — ideally 10+ of your 20 slots: different angles, scale/in-use, close-up of detail, and packaging. Photos are the #1 conversion lever.",
+      points: 20,
+    });
+  } else if (photoCount < 10) {
+    conversion -= 7;
+    issues.push({
+      field: "Photos",
+      category: "Conversion",
+      severity: "Warning",
+      problem: `You're using only ${photoCount} of 20 photo slots — add more angles/in-use/detail shots.`,
+      fix: "Fill more of your 20 slots: extra angles, an in-use/lifestyle shot, a detail close-up, scale, and packaging. More photos consistently lift conversion.",
+      points: 7,
     });
   }
 
@@ -438,6 +493,7 @@ export function scoreListing(input: ListingInput): ScoringResult {
       severity: "Critical",
       problem: "No real/lifestyle photo — plain mockups alone don't help buyers picture the product in their life.",
       fix: "Add at least one real photo showing the item in use or in a real setting (on a desk, worn, styled). It dramatically increases trust and sales.",
+      points: 20,
     });
   }
 
@@ -467,6 +523,60 @@ export function scoreListing(input: ListingInput): ScoringResult {
   };
   issues.sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
 
+  // --- Secondary per-section breakdown (display only) ---
+  // Each section starts at 100 and loses the points its own issues deducted.
+  // This is purely for a scannable "which section is dragging things down" row;
+  // it does not feed the two headline scores or the verdict.
+  const SECTION_OF: Record<string, SectionName> = {
+    Title: "Title",
+    "Target keyword": "Title",
+    Tags: "Tags",
+    Description: "Description",
+    Photos: "Photos",
+    Category: "Category",
+  };
+  const sectionNames: SectionName[] = [
+    "Title",
+    "Tags",
+    "Description",
+    "Photos",
+    "Category",
+  ];
+  const sectionDeductions: Record<SectionName, number> = {
+    Title: 0,
+    Tags: 0,
+    Description: 0,
+    Photos: 0,
+    Category: 0,
+  };
+  for (const it of issues) {
+    const sec = SECTION_OF[it.field];
+    if (sec) sectionDeductions[sec] += it.points;
+  }
+  const sections: SectionScore[] = sectionNames.map((name) => {
+    const score = clamp(100 - sectionDeductions[name]);
+    return { name, score, grade: gradeFor(score) };
+  });
+
+  // --- Tag completeness vs. quality (display only) ---
+  const weakTagSet = new Set<string>([
+    ...singleWordTags,
+    ...longTags,
+    ...dupes,
+  ]);
+  const weak = {
+    singleWord: singleWordTags.length,
+    tooLong: longTags.length,
+    duplicate: dupes.length,
+  };
+  const tagStats: TagStats = {
+    slotsUsed: tags.length,
+    totalSlots: 13,
+    weakCount: weakTagSet.size,
+    weak,
+    note: buildTagNote(tags.length, weak, weakTagSet.size),
+  };
+
   return {
     visibilityScore,
     conversionScore,
@@ -474,5 +584,44 @@ export function scoreListing(input: ListingInput): ScoringResult {
     conversionGrade: gradeFor(conversionScore),
     verdict,
     issues,
+    sections,
+    tagStats,
   };
+}
+
+/** Plain-English completeness + quality summary for the Tags section. */
+function buildTagNote(
+  slotsUsed: number,
+  weak: { singleWord: number; tooLong: number; duplicate: number },
+  weakCount: number
+): string {
+  const complete = slotsUsed >= 13;
+  const completePart = complete
+    ? "All 13 slots used"
+    : `Only ${slotsUsed}/13 slots used`;
+
+  if (weakCount === 0) {
+    return complete
+      ? "All 13 slots used with solid multi-word tags. Nice work."
+      : `${slotsUsed}/13 slots used — fill the rest with multi-word long-tail phrases buyers actually search.`;
+  }
+
+  const parts: string[] = [];
+  if (weak.singleWord > 0) {
+    parts.push(
+      `${weak.singleWord} single generic ${weak.singleWord === 1 ? "word" : "words"}`
+    );
+  }
+  if (weak.tooLong > 0) {
+    parts.push(`${weak.tooLong} over 20 characters`);
+  }
+  if (weak.duplicate > 0) {
+    parts.push(
+      `${weak.duplicate} ${weak.duplicate === 1 ? "duplicate" : "duplicates"}`
+    );
+  }
+  const weakDesc = parts.join(", ");
+  const connector = complete ? ", but" : ", and";
+
+  return `${completePart}${connector} ${weakDesc} — replace them with multi-word long-tail phrases buyers actually search.`;
 }

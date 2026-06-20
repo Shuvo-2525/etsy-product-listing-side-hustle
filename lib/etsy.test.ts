@@ -1,5 +1,48 @@
 import { describe, it, expect } from "vitest";
-import { extractListingId, mapEtsyListing, MAX_PHOTOS } from "./etsy";
+import {
+  extractListingId,
+  mapEtsyListing,
+  buildEtsyAuthHeader,
+  hasSharedSecret,
+  MAX_PHOTOS,
+} from "./etsy";
+
+describe("buildEtsyAuthHeader", () => {
+  it("combines keystring + separate shared secret", () => {
+    expect(buildEtsyAuthHeader("keystring", "secret")).toBe("keystring:secret");
+  });
+
+  it("passes through a value that already contains the secret", () => {
+    expect(buildEtsyAuthHeader("keystring:secret", "ignored")).toBe(
+      "keystring:secret"
+    );
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(buildEtsyAuthHeader("  key  ", "  sec  ")).toBe("key:sec");
+  });
+
+  it("returns the keystring alone when no secret is available", () => {
+    expect(buildEtsyAuthHeader("keystring")).toBe("keystring");
+  });
+
+  it("returns null when there's no keystring", () => {
+    expect(buildEtsyAuthHeader("")).toBeNull();
+    expect(buildEtsyAuthHeader(undefined)).toBeNull();
+  });
+});
+
+describe("hasSharedSecret", () => {
+  it("detects a present secret", () => {
+    expect(hasSharedSecret("key:secret")).toBe(true);
+  });
+
+  it("is false for keystring-only or empty", () => {
+    expect(hasSharedSecret("key")).toBe(false);
+    expect(hasSharedSecret("key:")).toBe(false);
+    expect(hasSharedSecret(null)).toBe(false);
+  });
+});
 
 describe("extractListingId", () => {
   it("pulls the id from a full Etsy URL", () => {
@@ -42,10 +85,11 @@ describe("mapEtsyListing", () => {
     expect(r.category).toBe("");
   });
 
-  it("caps photoCount at the form maximum", () => {
-    const images = Array.from({ length: 15 }, (_, i) => ({ id: i }));
+  it("caps photoCount at the form maximum (20)", () => {
+    const images = Array.from({ length: 25 }, (_, i) => ({ id: i }));
     const r = mapEtsyListing({ images });
     expect(r.photoCount).toBe(MAX_PHOTOS);
+    expect(MAX_PHOTOS).toBe(20);
   });
 
   it("is defensive about missing / malformed fields", () => {

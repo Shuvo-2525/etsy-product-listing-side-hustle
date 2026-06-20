@@ -1,6 +1,18 @@
-import type { ScoringResult } from "@/lib/scoring";
+import type { Issue, IssueSeverity, ScoringResult } from "@/lib/scoring";
 import ScoreCircle from "./ScoreCircle";
 import IssueCard from "./IssueCard";
+import SectionBreakdown from "./SectionBreakdown";
+import TagHealth from "./TagHealth";
+
+// Show the most urgent fixes first within each section.
+const SEVERITY_RANK: Record<IssueSeverity, number> = {
+  Critical: 0,
+  Warning: 1,
+  Info: 2,
+};
+
+const bySeverity = (a: Issue, b: Issue) =>
+  SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
 
 function verdictTone(result: ScoringResult): {
   banner: string;
@@ -26,27 +38,33 @@ function verdictTone(result: ScoringResult): {
 
 export default function Results({ result }: { result: ScoringResult }) {
   const tone = verdictTone(result);
-  const visibilityIssues = result.issues.filter(
-    (i) => i.category === "Visibility"
-  );
-  const conversionIssues = result.issues.filter(
-    (i) => i.category === "Conversion"
-  );
+  const visibilityIssues = result.issues
+    .filter((i) => i.category === "Visibility")
+    .sort(bySeverity);
+  const conversionIssues = result.issues
+    .filter((i) => i.category === "Conversion")
+    .sort(bySeverity);
 
   return (
     <div className="space-y-8">
-      {/* Score circles */}
-      <div className="flex flex-wrap items-center justify-center gap-10 rounded-2xl border border-etsy-sand bg-white p-6 shadow-sm sm:gap-16">
-        <ScoreCircle
-          label="Visibility"
-          score={result.visibilityScore}
-          grade={result.visibilityGrade}
-        />
-        <ScoreCircle
-          label="Conversion"
-          score={result.conversionScore}
-          grade={result.conversionGrade}
-        />
+      {/* Headline scores + secondary section breakdown */}
+      <div className="space-y-5 rounded-2xl border border-etsy-sand bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-center gap-10 sm:gap-16">
+          <ScoreCircle
+            label="Visibility"
+            score={result.visibilityScore}
+            grade={result.visibilityGrade}
+          />
+          <ScoreCircle
+            label="Conversion"
+            score={result.conversionScore}
+            grade={result.conversionGrade}
+          />
+        </div>
+
+        <div className="border-t border-etsy-sand pt-4">
+          <SectionBreakdown sections={result.sections} />
+        </div>
       </div>
 
       {/* Top-line verdict */}
@@ -60,6 +78,9 @@ export default function Results({ result }: { result: ScoringResult }) {
           {result.verdict}
         </p>
       </div>
+
+      {/* Tag completeness vs. quality */}
+      <TagHealth stats={result.tagStats} />
 
       {/* Issues grouped by category */}
       <div className="grid gap-8 lg:grid-cols-2">

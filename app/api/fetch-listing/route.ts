@@ -1,15 +1,35 @@
 import { NextResponse } from "next/server";
-import { extractListingId, mapEtsyListing } from "@/lib/etsy";
+import {
+  extractListingId,
+  mapEtsyListing,
+  buildEtsyAuthHeader,
+  hasSharedSecret,
+} from "@/lib/etsy";
 
 // Run server-side at request time so the Etsy API key never reaches the client.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const apiKey = process.env.ETSY_API_KEY;
-  if (!apiKey) {
+  // Etsy requires `x-api-key: <keystring>:<shared_secret>` on every request.
+  // Accept the secret either bundled into ETSY_API_KEY (with a ":") or as a
+  // separate ETSY_SHARED_SECRET.
+  const apiKeyHeader = buildEtsyAuthHeader(
+    process.env.ETSY_API_KEY,
+    process.env.ETSY_SHARED_SECRET
+  );
+  if (!apiKeyHeader) {
     return NextResponse.json(
       { error: "Server is missing ETSY_API_KEY. Add it to .env.local and restart." },
+      { status: 500 }
+    );
+  }
+  if (!hasSharedSecret(apiKeyHeader)) {
+    return NextResponse.json(
+      {
+        error:
+          "Etsy needs your shared secret too. Set ETSY_SHARED_SECRET in .env.local (or store ETSY_API_KEY as \"<keystring>:<shared_secret>\") and restart.",
+      },
       { status: 500 }
     );
   }
@@ -38,13 +58,25 @@ export async function POST(req: Request) {
   let data: unknown;
   try {
     const res = await fetch(etsyUrl, {
-      headers: { "x-api-key": apiKey },
+      headers: { "x-api-key": apiKeyHeader },
     });
 
     if (res.status === 404) {
       return NextResponse.json(
         { error: "Listing not found — it may be sold out, expired, or private." },
         { status: 404 }
+      );
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      const detail = await res.text().catch(() => "");
+      console.error("Etsy auth error:", res.status, detail);
+      return NextResponse.json(
+        {
+          error:
+            "Etsy rejected the API credentials. Check that ETSY_API_KEY (keystring) and ETSY_SHARED_SECRET are correct and the app is active.",
+        },
+        { status: 502 }
       );
     }
 
