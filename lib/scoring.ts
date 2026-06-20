@@ -524,9 +524,11 @@ export function scoreListing(input: ListingInput): ScoringResult {
   issues.sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
 
   // --- Secondary per-section breakdown (display only) ---
-  // Each section starts at 100 and loses the points its own issues deducted.
-  // This is purely for a scannable "which section is dragging things down" row;
-  // it does not feed the two headline scores or the verdict.
+  // Derived from the SAME issues shown for each section, so the score and the
+  // issue list always agree. Severity drives the deduction (any Critical pushes
+  // the section into a failing grade), and a section whose core content is
+  // empty is floored near zero — "missing" must never read as healthy.
+  // This row does not feed the two headline scores or the verdict.
   const SECTION_OF: Record<string, SectionName> = {
     Title: "Title",
     "Target keyword": "Title",
@@ -542,7 +544,12 @@ export function scoreListing(input: ListingInput): ScoringResult {
     "Photos",
     "Category",
   ];
-  const sectionDeductions: Record<SectionName, number> = {
+  const SEVERITY_WEIGHT: Record<IssueSeverity, number> = {
+    Critical: 55,
+    Warning: 35,
+    Info: 16,
+  };
+  const sectionPenalty: Record<SectionName, number> = {
     Title: 0,
     Tags: 0,
     Description: 0,
@@ -551,10 +558,19 @@ export function scoreListing(input: ListingInput): ScoringResult {
   };
   for (const it of issues) {
     const sec = SECTION_OF[it.field];
-    if (sec) sectionDeductions[sec] += it.points;
+    if (sec) sectionPenalty[sec] += SEVERITY_WEIGHT[it.severity];
   }
+  // A section's core content being absent is the worst possible state for it.
+  const sectionEmpty: Record<SectionName, boolean> = {
+    Title: title.length === 0,
+    Tags: tags.length === 0,
+    Description: description.length === 0,
+    Photos: photoCount === 0,
+    Category: category.length === 0,
+  };
   const sections: SectionScore[] = sectionNames.map((name) => {
-    const score = clamp(100 - sectionDeductions[name]);
+    let score = clamp(100 - sectionPenalty[name]);
+    if (sectionEmpty[name]) score = Math.min(score, 5);
     return { name, score, grade: gradeFor(score) };
   });
 

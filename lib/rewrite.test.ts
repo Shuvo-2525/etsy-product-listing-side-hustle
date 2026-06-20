@@ -32,6 +32,12 @@ describe("buildRewritePrompt", () => {
     const p = buildRewritePrompt({ ...sample, targetKeyword: undefined });
     expect(p).toContain("Target keyword: ");
   });
+
+  it("instructs the model to stay grounded and not invent a product", () => {
+    const p = buildRewritePrompt(sample);
+    expect(p).toMatch(/grounded in the EXACT product/i);
+    expect(p).toMatch(/never fabricate a different item/i);
+  });
 });
 
 describe("parseRewriteJson", () => {

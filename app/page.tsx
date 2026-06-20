@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { scoreListing, type ListingInput, type ScoringResult } from "@/lib/scoring";
 import Results from "@/components/Results";
-import OptimizedRewrite from "@/components/OptimizedRewrite";
+import OptimizedRewrite, {
+  type OptimizedRewriteHandle,
+} from "@/components/OptimizedRewrite";
 
 const EMPTY_TAGS = Array.from({ length: 13 }, () => "");
 
 const inputClass =
-  "w-full rounded-lg border border-etsy-sand bg-white px-3 py-2 text-sm text-etsy-dark shadow-sm outline-none transition focus:border-etsy-orange focus:ring-2 focus:ring-etsy-orange/30";
+  "w-full rounded-xl border border-black/[0.08] bg-white/80 px-3.5 py-2.5 text-sm text-etsy-dark placeholder:text-etsy-faint shadow-sm outline-none transition-all duration-200 focus:border-etsy-orange/60 focus:bg-white focus:ring-4 focus:ring-etsy-orange/10";
 
-const labelClass = "block text-sm font-semibold text-etsy-dark";
+const labelClass = "block text-[13px] font-semibold text-etsy-dark";
 
 export default function Home() {
   const [title, setTitle] = useState("");
@@ -25,6 +27,18 @@ export default function Home() {
   // Snapshot of exactly what was scored, so the AI rewrite matches the results
   // even if the user edits the form afterwards.
   const [scoredInput, setScoredInput] = useState<ListingInput | null>(null);
+
+  // Floating "AI Rewrite" button → drives the OptimizedRewrite component.
+  const rewriteRef = useRef<OptimizedRewriteHandle>(null);
+  const rewriteHasContent = (scoredInput?.title ?? "").trim().length > 0;
+  const handleRewriteFab = () => {
+    rewriteRef.current?.generate();
+    requestAnimationFrame(() => {
+      document
+        .getElementById("ai-rewrite")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   // Auto-fill from Etsy link.
   const [listingUrl, setListingUrl] = useState("");
@@ -137,38 +151,54 @@ export default function Home() {
     });
   };
 
+  const tagsUsed = tags.filter((t) => t.trim()).length;
+
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+    <main className="mx-auto w-full max-w-[1180px] px-6 py-12 sm:px-8">
       {/* Header */}
-      <header className="mb-8 text-center">
-        <h1 className="text-3xl font-extrabold tracking-tight text-etsy-dark sm:text-4xl">
+      <header className="mb-10 text-center sm:mb-16">
+        <div className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-black/[0.06] bg-white/70 px-3.5 py-1.5 text-xs font-medium text-etsy-muted shadow-sm backdrop-blur">
+          <span className="h-1.5 w-1.5 rounded-full bg-etsy-orange" />
+          Two scores. One clear priority.
+        </div>
+        <h1
+          className="animate-fade-up mt-5 text-4xl font-bold leading-[1.05] tracking-tightest text-etsy-dark sm:text-6xl"
+          style={{ animationDelay: "60ms" }}
+        >
           Etsy Listing{" "}
-          <span className="text-etsy-orange">Health Check</span>
+          <span className="bg-gradient-to-r from-etsy-orange to-[#FF9A3D] bg-clip-text text-transparent">
+            Health Check
+          </span>
         </h1>
-        <p className="mx-auto mt-3 max-w-2xl text-sm text-etsy-dark/70 sm:text-base">
-          Paste a listing and get two scores instantly:{" "}
-          <strong>Visibility</strong> (will buyers find it?) and{" "}
-          <strong>Conversion</strong> (will visitors actually buy?). Most tools
-          only check SEO — we tell you which problem to fix first.
+        <p
+          className="animate-fade-up mx-auto mt-5 max-w-2xl text-base leading-relaxed text-etsy-muted sm:text-lg"
+          style={{ animationDelay: "120ms" }}
+        >
+          Instantly see <span className="font-semibold text-etsy-dark">Visibility</span>{" "}
+          (will buyers find it?) and{" "}
+          <span className="font-semibold text-etsy-dark">Conversion</span> (will they
+          actually buy?). Most tools only check SEO — we tell you which problem to fix
+          first.
         </p>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         {/* ---------------- Form ---------------- */}
         <form
           onSubmit={handleSubmit}
-          className="space-y-5 rounded-2xl border border-etsy-sand bg-white p-6 shadow-sm"
+          className="animate-fade-up h-fit space-y-5 rounded-3xl border border-black/[0.06] bg-white p-6 shadow-soft"
+          style={{ animationDelay: "160ms" }}
         >
           {/* Auto-fill from Etsy link */}
-          <div className="rounded-xl border border-etsy-orange/30 bg-etsy-cream p-4">
+          <div className="rounded-2xl border border-etsy-orange/25 bg-gradient-to-br from-etsy-cream to-white p-4">
             <label htmlFor="listingUrl" className={labelClass}>
               🔗 Auto-fill from Etsy link
             </label>
-            <p className="mt-1 text-xs text-etsy-dark/60">
+            <p className="mt-1 text-xs text-etsy-muted">
               Paste a listing URL to pull in its details — or just fill the form
               manually below.
             </p>
-            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input
                 id="listingUrl"
                 type="url"
@@ -185,7 +215,7 @@ export default function Home() {
                 type="button"
                 onClick={handleFetch}
                 disabled={fetching || !listingUrl.trim()}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-etsy-dark px-4 py-2 text-sm font-bold text-white transition hover:bg-etsy-dark/90 focus:outline-none focus:ring-2 focus:ring-etsy-dark/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-etsy-dark px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift focus:outline-none focus:ring-4 focus:ring-etsy-dark/15 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
               >
                 {fetching && (
                   <span
@@ -197,12 +227,12 @@ export default function Home() {
               </button>
             </div>
             {fetchError && (
-              <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+              <p className="animate-fade-in mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
                 {fetchError}
               </p>
             )}
             {fetchOk && !fetchError && (
-              <p className="mt-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700">
+              <p className="animate-fade-in mt-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700">
                 ✓ Listing loaded. Review the fields below, set the lifestyle-photo
                 answer, then check your listing.
               </p>
@@ -219,9 +249,9 @@ export default function Home() {
               onChange={(e) => setTitle(e.target.value)}
               rows={2}
               placeholder="Personalized Ceramic Coffee Mug, Custom Name Gift for Mom…"
-              className={`${inputClass} mt-1 resize-y`}
+              className={`${inputClass} mt-1.5 resize-y`}
             />
-            <p className="mt-1 text-xs text-etsy-dark/50">
+            <p className="mt-1.5 text-xs text-etsy-faint">
               {title.length} / 140 characters
             </p>
           </div>
@@ -233,17 +263,17 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={clearTags}
-                  className="text-xs font-semibold text-etsy-orange hover:underline"
+                  className="text-xs font-semibold text-etsy-orange transition hover:opacity-70"
                 >
                   Clear all
                 </button>
               )}
             </div>
-            <p className="mt-1 text-xs text-etsy-dark/50">
+            <p className="mt-1 text-xs text-etsy-faint">
               Tip: paste your whole comma-separated list into any box and we&apos;ll
               split it across the 13 fields.
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-2">
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
               {tags.map((tag, i) => (
                 <input
                   key={i}
@@ -257,10 +287,9 @@ export default function Home() {
                 />
               ))}
             </div>
-            <p className="mt-1 text-xs text-etsy-dark/50">
-              {tags.filter((t) => t.trim()).length} / 13 used · multi-word
-              phrases work best
-            </p>
+            <div className="mt-2 flex items-center justify-between text-xs text-etsy-faint">
+              <span>{tagsUsed} / 13 used · multi-word phrases work best</span>
+            </div>
           </div>
 
           <div>
@@ -273,9 +302,9 @@ export default function Home() {
               onChange={(e) => setDescription(e.target.value)}
               rows={6}
               placeholder="Start with a hook: who it's perfect for and why they'll love it…"
-              className={`${inputClass} mt-1 resize-y`}
+              className={`${inputClass} mt-1.5 resize-y`}
             />
-            <p className="mt-1 text-xs text-etsy-dark/50">
+            <p className="mt-1.5 text-xs text-etsy-faint">
               {description.length} characters
             </p>
           </div>
@@ -290,14 +319,14 @@ export default function Home() {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Home & Living > Kitchen > Drinkware > Mugs"
-              className={`${inputClass} mt-1`}
+              className={`${inputClass} mt-1.5`}
             />
           </div>
 
           <div>
             <label htmlFor="keyword" className={labelClass}>
               Target keyword{" "}
-              <span className="font-normal text-etsy-dark/50">(optional)</span>
+              <span className="font-normal text-etsy-faint">(optional)</span>
             </label>
             <input
               id="keyword"
@@ -305,7 +334,7 @@ export default function Home() {
               value={targetKeyword}
               onChange={(e) => setTargetKeyword(e.target.value)}
               placeholder="personalized coffee mug"
-              className={`${inputClass} mt-1`}
+              className={`${inputClass} mt-1.5`}
             />
           </div>
 
@@ -324,16 +353,16 @@ export default function Home() {
                   Math.max(0, Math.min(20, Number(e.target.value) || 0))
                 )
               }
-              className={`${inputClass} mt-1`}
+              className={`${inputClass} mt-1.5`}
             />
           </div>
 
-          <div className="rounded-lg border border-etsy-sand bg-etsy-cream p-3">
+          <div className="rounded-2xl border border-black/[0.06] bg-etsy-cream/70 p-4">
             <span className={labelClass}>
               Do you have at least one real/lifestyle photo (not just a plain
               mockup)?
             </span>
-            <div className="mt-2 flex gap-3">
+            <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-xl bg-black/[0.04] p-1">
               {[
                 { label: "Yes", value: true },
                 { label: "No", value: false },
@@ -342,10 +371,10 @@ export default function Home() {
                   type="button"
                   key={opt.label}
                   onClick={() => setHasLifestylePhoto(opt.value)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-200 ${
                     hasLifestylePhoto === opt.value
-                      ? "border-etsy-orange bg-etsy-orange text-white"
-                      : "border-etsy-sand bg-white text-etsy-dark hover:border-etsy-orange/50"
+                      ? "bg-white text-etsy-dark shadow-sm"
+                      : "text-etsy-muted hover:text-etsy-dark"
                   }`}
                 >
                   {opt.label}
@@ -356,35 +385,60 @@ export default function Home() {
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-etsy-orange px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-etsy-orange/90 focus:outline-none focus:ring-2 focus:ring-etsy-orange/40 active:scale-[0.99]"
+            className="w-full rounded-2xl bg-gradient-to-b from-etsy-orange to-etsy-orangeDark px-4 py-3.5 text-[15px] font-semibold text-white shadow-accent transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift focus:outline-none focus:ring-4 focus:ring-etsy-orange/25 active:translate-y-0 active:scale-[0.99]"
           >
             Check my listing
           </button>
         </form>
 
         {/* ---------------- Results ---------------- */}
-        <div id="results">
+        <div id="results" className="scroll-mt-6">
           {result ? (
             <>
               <Results result={result} />
-              {scoredInput && <OptimizedRewrite input={scoredInput} />}
+              {scoredInput && (
+                <OptimizedRewrite ref={rewriteRef} input={scoredInput} />
+              )}
             </>
           ) : (
-            <div className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-etsy-sand bg-white/50 p-8 text-center">
-              <div className="mb-3 text-4xl">📋</div>
-              <p className="max-w-xs text-sm text-etsy-dark/60">
+            <div className="animate-fade-up flex h-full min-h-[340px] flex-col items-center justify-center rounded-3xl border border-dashed border-black/10 bg-white/50 p-10 text-center" style={{ animationDelay: "220ms" }}>
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-etsy-cream to-etsy-sand text-3xl shadow-sm">
+                📋
+              </div>
+              <p className="max-w-xs text-[15px] leading-relaxed text-etsy-muted">
                 Fill in your listing details and hit{" "}
-                <strong>Check my listing</strong> to see your Visibility and
-                Conversion scores.
+                <span className="font-semibold text-etsy-dark">Check my listing</span>{" "}
+                to see your Visibility and Conversion scores.
               </p>
             </div>
           )}
         </div>
       </div>
 
-      <footer className="mt-12 text-center text-xs text-etsy-dark/40">
+      <footer className="mt-16 text-center text-xs text-etsy-faint">
         Not affiliated with Etsy. Scores are heuristic guidance, not guarantees.
       </footer>
+
+      {/* Floating AI Rewrite action — only after an analysis has run */}
+      {result && (
+        <button
+          type="button"
+          onClick={handleRewriteFab}
+          disabled={!rewriteHasContent}
+          title={
+            rewriteHasContent
+              ? "Generate an AI-optimized rewrite"
+              : "Add your listing details first"
+          }
+          aria-label="AI Rewrite"
+          className="animate-fade-up fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-etsy-orange to-etsy-orangeDark px-5 py-3.5 text-sm font-semibold text-white shadow-accent transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift focus:outline-none focus:ring-4 focus:ring-etsy-orange/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 sm:bottom-6 sm:right-6"
+        >
+          <span className="text-base" aria-hidden>
+            ✨
+          </span>
+          AI Rewrite
+        </button>
+      )}
     </main>
   );
 }

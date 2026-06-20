@@ -24,6 +24,7 @@ export function buildRewritePrompt(input: ListingInput): string {
   const tags = (input.tags ?? []).map((t) => t.trim()).filter(Boolean).join(", ");
   return `You are an Etsy SEO and conversion expert. Rewrite the listing below to improve BOTH search visibility AND buyer conversion.
 Hard rules:
+- Stay strictly grounded in the EXACT product described below. Do NOT invent, rename, or substitute a different product. If some fields are sparse, improve only the wording for the product that is actually given — never fabricate a different item, brand, or category.
 - Title: max 140 characters. Most important buyer search keyword in the first 40 characters. Natural readable phrase (not comma-stuffed). Must clearly state what the product is.
 - Tags: exactly 13 tags, each max 20 characters, multi-word long-tail phrases buyers actually type, no duplicates, no single generic words, don't repeat the full title.
 - Description opening: first 2-3 lines as a compelling hook saying who it's for and why they'll love it, naturally including the main keyword.

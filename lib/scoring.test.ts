@@ -356,11 +356,40 @@ describe("per-section breakdown (display metadata)", () => {
       ],
     });
     const byName = Object.fromEntries(r.sections.map((s) => [s.name, s]));
-    // 4 single-word tags → -12 (capped) on the Tags section only.
-    expect(byName.Tags.score).toBe(88);
+    // One Warning issue on Tags (the single-word tags) → 100 - 35 = 65 (C),
+    // and nothing else is touched.
+    expect(byName.Tags.score).toBe(65);
+    expect(byName.Tags.grade).toBe("C");
     expect(byName.Title.score).toBe(100);
     expect(byName.Photos.score).toBe(100);
     expect(byName.Description.score).toBe(100);
+    expect(byName.Category.score).toBe(100);
+  });
+
+  it("empty input scores every section near zero (never inflated)", () => {
+    const r = scoreListing({
+      title: "",
+      tags: [],
+      description: "",
+      category: "",
+      targetKeyword: undefined,
+      photoCount: 0,
+      hasLifestylePhoto: false,
+    });
+    for (const s of r.sections) {
+      expect(s.score).toBeLessThanOrEqual(10);
+      expect(s.grade).toBe("D");
+    }
+  });
+
+  it("an empty Category can never be 90/A while 'no category' is flagged", () => {
+    const r = scoreListing({ ...goodListing, category: "" });
+    const category = r.sections.find((s) => s.name === "Category")!;
+    expect(
+      r.issues.some((i) => i.field === "Category" && /no category/i.test(i.problem))
+    ).toBe(true);
+    expect(category.score).toBeLessThanOrEqual(10);
+    expect(category.grade).toBe("D");
   });
 });
 
@@ -407,5 +436,13 @@ describe("tag completeness vs quality (display metadata)", () => {
     expect(r.tagStats.slotsUsed).toBe(13);
     expect(r.tagStats.weakCount).toBe(0);
     expect(r.tagStats.note).toMatch(/solid multi-word tags/i);
+  });
+
+  it("reports 0 slots / 0 weak when there are no tags (quality is N/A)", () => {
+    const r = scoreListing({ ...goodListing, tags: [] });
+    // The UI keys "N/A — add tags first" off slotsUsed === 0; quality must not
+    // be asserted as strong when there is nothing to assess.
+    expect(r.tagStats.slotsUsed).toBe(0);
+    expect(r.tagStats.weakCount).toBe(0);
   });
 });

@@ -3,11 +3,14 @@ import type { TagStats } from "@/lib/scoring";
 export default function TagHealth({ stats }: { stats: TagStats }) {
   const completePct = Math.round((stats.slotsUsed / stats.totalSlots) * 100);
   const complete = stats.slotsUsed >= stats.totalSlots;
+  // Only assess quality once at least one tag exists — otherwise there is
+  // nothing to judge (don't claim "All strong" for an empty tag set).
+  const noTags = stats.slotsUsed === 0;
   const hasWeak = stats.weakCount > 0;
 
   return (
-    <div className="rounded-2xl border border-etsy-sand bg-white p-5">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-etsy-dark/60">
+    <div className="rounded-3xl border border-black/[0.06] bg-white p-6 shadow-soft">
+      <h3 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-etsy-faint">
         🏷️ Tag health
       </h3>
 
@@ -44,17 +47,23 @@ export default function TagHealth({ stats }: { stats: TagStats }) {
             </span>
             <span
               className={`text-sm font-bold ${
-                hasWeak ? "text-amber-600" : "text-green-600"
+                noTags
+                  ? "text-etsy-faint"
+                  : hasWeak
+                  ? "text-amber-600"
+                  : "text-green-600"
               }`}
             >
-              {hasWeak
+              {noTags
+                ? "N/A — add tags first"
+                : hasWeak
                 ? `${stats.weakCount} weak ${
                     stats.weakCount === 1 ? "tag" : "tags"
                   }`
                 : "All strong"}
             </span>
           </div>
-          {hasWeak && (
+          {!noTags && hasWeak && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {stats.weak.singleWord > 0 && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">

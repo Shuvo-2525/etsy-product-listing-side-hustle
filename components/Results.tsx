@@ -17,22 +17,30 @@ const bySeverity = (a: Issue, b: Issue) =>
 function verdictTone(result: ScoringResult): {
   banner: string;
   heading: string;
+  icon: string;
+  kicker: string;
 } {
   if (result.visibilityScore < 60) {
     return {
-      banner: "border-red-300 bg-red-50",
-      heading: "text-red-700",
+      banner: "border-red-200 bg-gradient-to-br from-red-50 to-white",
+      heading: "text-red-600",
+      icon: "🔍",
+      kicker: "Priority: Visibility",
     };
   }
   if (result.conversionScore < 60) {
     return {
-      banner: "border-amber-300 bg-amber-50",
-      heading: "text-amber-700",
+      banner: "border-amber-200 bg-gradient-to-br from-amber-50 to-white",
+      heading: "text-amber-600",
+      icon: "🛒",
+      kicker: "Priority: Conversion",
     };
   }
   return {
-    banner: "border-green-300 bg-green-50",
-    heading: "text-green-700",
+    banner: "border-green-200 bg-gradient-to-br from-green-50 to-white",
+    heading: "text-green-600",
+    icon: "✓",
+    kicker: "Looking good",
   };
 }
 
@@ -46,10 +54,10 @@ export default function Results({ result }: { result: ScoringResult }) {
     .sort(bySeverity);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* Headline scores + secondary section breakdown */}
-      <div className="space-y-5 rounded-2xl border border-etsy-sand bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-center gap-10 sm:gap-16">
+      <div className="animate-scale-in space-y-6 rounded-3xl border border-black/[0.06] bg-white p-6 shadow-soft">
+        <div className="flex flex-wrap items-center justify-center gap-12 sm:gap-20">
           <ScoreCircle
             label="Visibility"
             score={result.visibilityScore}
@@ -62,66 +70,84 @@ export default function Results({ result }: { result: ScoringResult }) {
           />
         </div>
 
-        <div className="border-t border-etsy-sand pt-4">
+        <div className="border-t border-black/[0.06] pt-6">
           <SectionBreakdown sections={result.sections} />
         </div>
       </div>
 
       {/* Top-line verdict */}
-      <div className={`rounded-2xl border-2 p-5 ${tone.banner}`}>
-        <h2
-          className={`mb-1 text-sm font-bold uppercase tracking-wide ${tone.heading}`}
-        >
-          Top-line verdict
-        </h2>
-        <p className="text-lg font-semibold leading-snug text-etsy-dark">
-          {result.verdict}
-        </p>
+      <div
+        className={`animate-fade-up flex items-start gap-4 rounded-3xl border p-6 shadow-soft ${tone.banner}`}
+        style={{ animationDelay: "120ms" }}
+      >
+        <div className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-white/80 text-xl shadow-sm">
+          {tone.icon}
+        </div>
+        <div>
+          <p
+            className={`text-xs font-bold uppercase tracking-[0.08em] ${tone.heading}`}
+          >
+            {tone.kicker}
+          </p>
+          <p className="mt-1 text-[17px] font-semibold leading-snug text-etsy-dark">
+            {result.verdict}
+          </p>
+        </div>
       </div>
 
       {/* Tag completeness vs. quality */}
-      <TagHealth stats={result.tagStats} />
+      <div className="animate-fade-up" style={{ animationDelay: "180ms" }}>
+        <TagHealth stats={result.tagStats} />
+      </div>
 
-      {/* Issues grouped by category */}
-      <div className="grid gap-8 lg:grid-cols-2">
+      {/* Issues — masonry column-fill so the two groups pack tightly and
+          don't leave big uneven blank areas. */}
+      <div
+        className="animate-fade-up space-y-5"
+        style={{ animationDelay: "240ms" }}
+      >
         <section>
-          <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-etsy-dark">
-            🔍 Visibility issues
-            <span className="rounded-full bg-etsy-sand px-2 py-0.5 text-xs font-bold text-etsy-dark/70">
+          <h3 className="mb-3 flex items-center gap-2 text-base font-bold text-etsy-dark">
+            <span className="text-lg">🔍</span> Visibility issues
+            <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-xs font-bold text-etsy-muted">
               {visibilityIssues.length}
             </span>
           </h3>
-          <div className="space-y-3">
-            {visibilityIssues.length === 0 ? (
-              <p className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700">
-                No visibility issues found. Nice work.
-              </p>
-            ) : (
-              visibilityIssues.map((issue, i) => (
-                <IssueCard key={`v-${i}`} issue={issue} />
-              ))
-            )}
-          </div>
+          {visibilityIssues.length === 0 ? (
+            <p className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700">
+              No visibility issues found. Nice work.
+            </p>
+          ) : (
+            <div className="columns-1 gap-3 sm:columns-2">
+              {visibilityIssues.map((issue, i) => (
+                <div key={`v-${i}`} className="mb-3 break-inside-avoid">
+                  <IssueCard issue={issue} index={i} />
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section>
-          <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-etsy-dark">
-            🛒 Conversion issues
-            <span className="rounded-full bg-etsy-sand px-2 py-0.5 text-xs font-bold text-etsy-dark/70">
+          <h3 className="mb-3 flex items-center gap-2 text-base font-bold text-etsy-dark">
+            <span className="text-lg">🛒</span> Conversion issues
+            <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-xs font-bold text-etsy-muted">
               {conversionIssues.length}
             </span>
           </h3>
-          <div className="space-y-3">
-            {conversionIssues.length === 0 ? (
-              <p className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700">
-                No conversion issues found. Nice work.
-              </p>
-            ) : (
-              conversionIssues.map((issue, i) => (
-                <IssueCard key={`c-${i}`} issue={issue} />
-              ))
-            )}
-          </div>
+          {conversionIssues.length === 0 ? (
+            <p className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700">
+              No conversion issues found. Nice work.
+            </p>
+          ) : (
+            <div className="columns-1 gap-3 sm:columns-2">
+              {conversionIssues.map((issue, i) => (
+                <div key={`c-${i}`} className="mb-3 break-inside-avoid">
+                  <IssueCard issue={issue} index={i} />
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

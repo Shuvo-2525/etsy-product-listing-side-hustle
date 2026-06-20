@@ -30,6 +30,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
+  // Never run the rewrite without real content — an empty form makes the model
+  // hallucinate an unrelated product. Require at least a product title.
+  if (!(input.title ?? "").trim()) {
+    return NextResponse.json(
+      {
+        error:
+          "Add your listing details first — the rewrite needs at least a product title to stay grounded in your actual item.",
+      },
+      { status: 400 }
+    );
+  }
+
   const prompt = buildRewritePrompt(input);
 
   let geminiText: string;
